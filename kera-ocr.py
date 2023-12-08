@@ -4,7 +4,7 @@ import keras_ocr
 pipeline = keras_ocr.pipeline.Pipeline()
 
 # Use the pipeline to recognize text from an image. You can use any image file format that is supported by keras (e.g., png, jpg).
-image = keras_ocr.tools.read('test/1.png') 
+image = keras_ocr.tools.read('processed_image.png') 
 predictions = pipeline.recognize([image])[0]
 
 for text, box in predictions:
