@@ -1,0 +1,7 @@
+path: /Users/jade/Developer/Anti-Andy/OD-yolov8/data
+train: images/train
+val: images/train
+
+names:
+  0: m_quesiton
+  1: s_question
