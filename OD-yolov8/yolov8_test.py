@@ -1,8 +1,8 @@
 from ultralytics import YOLO
 
-model = YOLO('/Users/jade/Developer/Anti-Andy/runs/detect/train/weights/best.pt')
+model = YOLO('/Users/jade/Developer/Anti-Andy/runs/detect/train10/weights/best.pt')
 
-results = model.predict(source=['/Users/jade/Developer/Anti-Andy/test/1.png'], show = True, device='cpu')
+results = model.predict(source=['/Users/jade/Developer/Anti-Andy/test/3.jpg'], show = True, device='mps')
 
 print(results)
 

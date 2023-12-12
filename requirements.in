@@ -4,3 +4,5 @@ tqdm
 pytesseract
 pandas
 numpy
+ultralytics
+easyocr
