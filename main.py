@@ -1,11 +1,11 @@
 from ultralytics import YOLO
 import cv2
-import numpy as np
-import torch
 import os
 import easyocr
-from matplotlib import pyplot as plt
+from sentence_transformers import SentenceTransformer
 
+
+# filter the question by confidence
 def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
 
     # Create a mask of booleans where the confidence is greater than the given threshold
@@ -25,7 +25,7 @@ def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
     return combined
 
 
-
+# convert image to cv2 for easier reading and cropping
 def convert_images_to_cv2_values(folder_path):
     image_list = []
     
@@ -36,46 +36,59 @@ def convert_images_to_cv2_values(folder_path):
     
     return image_list
 
+##############################################################################
+################################# INITIATION ################################# 
+##############################################################################
+# load the models
+embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+detection_model = YOLO('ms_question_detection.pt')
 
-# choose the trained model
-model = YOLO('ms_question_detection.pt')
+# load datas
+question_path = "hw"
+cv2image = convert_images_to_cv2_values(question_path)
 
-# get the cv2 array of image
-cv2image = convert_images_to_cv2_values("hw")
-modified_cv2image = cv2image
+##############################################################################
+############################# question analysis ############################## 
+##############################################################################
+def q_data_const(detection_result):
+    # create container to store the data
+    q_data = []
+    for result in detect_results:
+        xyxy = get_boxes_xyxy_numpy(result)
+        q_data.append(xyxy)
+
+    # write data into the container by iteration
+    counter = 0
+    reader = easyocr.Reader(['en'])
+    for page in q_data:
+        for question in page:
+            x1 = question[0][0]
+            y1 = question[0][1] 
+            x2 = question[0][2] 
+            y2 = question[0][3] 
+            image = cv2image[counter]
+            cropped_image = image[ round(y1):round(y2),round(x1):round(x2)]
+            question[1] = " ".join(reader.readtext(cropped_image, detail = 0))
+            question[2] = embedding_model.encode(question[1])
+        counter += 1
+        for page in range(len(q_data)):
+            q_data[page] = sorted_list = sorted(q_data[page], key=lambda x: x[0][1])
+
+    return q_data
+
+def mark_question(q_data):
+    for page in range(len(question_data)):
+        for question in question_data[page]:
+            x1, y1, x2, y2 = question[0]
+            image = cv2image[page]
+            cv2.rectangle(image, (round(x1), round(y1)), (round(x2), round(y2)), (0, 255, 0), 2)
+            cv2.imshow('Image with Boxes', image)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
 # detect the questions
-results = model.predict(source=cv2image, show = False, device='mps')
+detect_results = detection_model.predict(source=cv2image, show = False, device='mps')
 
-# create a list of arrays, using indext to find page and question number, eg.[0][0] stand for the first quesion on first page
-list_boxes_xy = []
-for result in results:
-    xyxy = get_boxes_xyxy_numpy(result)
-    list_boxes_xy.append(xyxy)
+question_data = q_data_const(detect_results)
 
-counter = 0
-reader = easyocr.Reader(['en'])
-for i in list_boxes_xy:
-    for j in i:
-        x1 = j[0][0]
-        y1 = j[0][1] 
-        x2 = j[0][2] 
-        y2 = j[0][3] 
-        image = cv2image[counter]
-        cropped_image = image[ round(y1):round(y2),round(x1):round(x2)]
-        j[1] = " ".join(reader.readtext(cropped_image, detail = 0))
-    counter += 1
-
-print(list_boxes_xy[0][0])
-
-
-for page in range(len(list_boxes_xy)):
-    for question in list_boxes_xy[page]:
-        x1, y1, x2, y2 = question[0]
-        image = cv2image[page]
-        cv2.rectangle(image, (round(x1), round(y1)), (round(x2), round(y2)), (0, 255, 0), 2)
-        cv2.imshow('Image with Boxes', image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
+mark_question(question_data)
