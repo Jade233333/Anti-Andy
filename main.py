@@ -4,6 +4,33 @@ import os
 import easyocr
 from sentence_transformers import SentenceTransformer
 
+##############################################################################
+################################# INITIATION ################################# 
+##############################################################################
+
+# convert image to cv2 for easier reading and cropping
+def convert_images_to_cv2_values(folder_path):
+    image_list = []
+    
+    for filename in os.listdir(folder_path):
+        img = cv2.imread(os.path.join(folder_path, filename))
+        if img is not None:
+            image_list.append(img)
+    
+    return image_list
+
+
+# load the models
+embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+detection_model = YOLO('ms_question_detection.pt')
+
+# load datas
+question_path = "hw"
+cv2image = convert_images_to_cv2_values(question_path)
+
+##############################################################################
+############################# question analysis ############################## 
+##############################################################################
 
 # filter the question by confidence
 def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
@@ -25,31 +52,6 @@ def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
     return combined
 
 
-# convert image to cv2 for easier reading and cropping
-def convert_images_to_cv2_values(folder_path):
-    image_list = []
-    
-    for filename in os.listdir(folder_path):
-        img = cv2.imread(os.path.join(folder_path, filename))
-        if img is not None:
-            image_list.append(img)
-    
-    return image_list
-
-##############################################################################
-################################# INITIATION ################################# 
-##############################################################################
-# load the models
-embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-detection_model = YOLO('ms_question_detection.pt')
-
-# load datas
-question_path = "hw"
-cv2image = convert_images_to_cv2_values(question_path)
-
-##############################################################################
-############################# question analysis ############################## 
-##############################################################################
 def q_data_const(detection_result):
     # create container to store the data
     q_data = []
@@ -88,7 +90,5 @@ def mark_question(q_data):
 
 # detect the questions
 detect_results = detection_model.predict(source=cv2image, show = False, device='mps')
-
 question_data = q_data_const(detect_results)
-
 mark_question(question_data)

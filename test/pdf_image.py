@@ -1,48 +1,40 @@
 import os
-import pdf2image
-from multiprocessing import Pool, cpu_count
+import cv2
+import numpy as np
+import concurrent.futures
+from pdf2image import convert_from_path
 from tqdm import tqdm
 
-def convert_pdf_to_images(args):
-    filename, folder_path, output_folder_path = args
-    if filename.endswith(".pdf"):
-        # Extract file name without extension
-        file_name_without_ext = os.path.splitext(filename)[0]
+def convert_pdf_to_image(pdf_file, pdf_dir, save_dir):
+    # Convert the PDF to images
+    images = convert_from_path(os.path.join(pdf_dir, pdf_file))
 
-        # Get the full path of the PDF file
-        pdf_path = os.path.join(folder_path, filename)
+    # Iterate over every image (i.e., every page of the PDF)
+    for i, image in enumerate(images):
+        # Convert the PIL Image to an OpenCV Image (in BGR format)
+        cv2_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-        # Convert PDF pages to JPEG images
-        images = pdf2image.convert_from_path(pdf_path)
+        # Create the directory if it doesn't exist
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
-        # Loop through each page
-        for i, image in enumerate(images):
-            # Define the output filename for the JPEG
-            output_filename = f"{file_name_without_ext}_page_{i+1}.jpeg"
+        # Save the image
+        cv2.imwrite(os.path.join(save_dir, f'{pdf_file}_{i}.png'), cv2_image)
 
-            # Save the JPEG image
-            image.save(os.path.join(output_folder_path, output_filename))
+def convert_pdf_to_images_concurrent(pdf_dir, save_dir):
+    # Get a list of all PDF files in the directory
+    pdf_files = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf')]
 
-    # Return a result to signify that the task is done
-    return 1
+    # Use a ProcessPoolExecutor to parallelize the work
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Use list to force execution and tqdm for progress bar
+        list(tqdm(executor.map(convert_pdf_to_image, pdf_files, [pdf_dir]*len(pdf_files), [save_dir]*len(pdf_files)), total=len(pdf_files)))
 
-if __name__ == "__main__":
-    # Define the folder containing the PDF files
-    folder_path = "data/pre_pdf"
+def main():
+    # Call the function
+    convert_pdf_to_images_concurrent('raw_question_bank/multi', 'raw_question_bank/multi/images')
 
-    # Define the output folder for the converted JPEGs
-    output_folder_path = "data/images"
 
-    # Check if the output folder exists, create it if not
-    if not os.path.exists(output_folder_path):
-        os.makedirs(output_folder_path)
+if __name__ == '__main__':
+    main()
 
-    # Get all files in the directory
-    all_files = [(file, folder_path, output_folder_path) for file in os.listdir(folder_path) if file.endswith(".pdf")]
-
-    # Use multiprocessing to process multiple files at once
-    with Pool(cpu_count() - 1) as p:
-        for _ in tqdm(p.imap_unordered(convert_pdf_to_images, all_files), total=len(all_files)):
-            pass
-
-    print("PDF pages converted to JPEG successfully!")

@@ -21,6 +21,7 @@ data = {
     'q_number': 1
 }
 
+
 # prepare insert statement
 add_data = ("INSERT INTO question_bank"
             "(text, embedding, paper, page, q_number) "
