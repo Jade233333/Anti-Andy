@@ -4,6 +4,8 @@ import os
 import easyocr
 from sentence_transformers import SentenceTransformer
 import mysql.connector
+from tqdm import tqdm
+import pickle
 
 ##############################################################################
 ################################# INITIATION ################################# 
@@ -11,15 +13,15 @@ import mysql.connector
 
 # convert image to cv2 for easier reading and cropping
 def convert_images_to_cv2_values(folder_path):
-    image_dict = {} 
+    image_list = [] 
     
-    for filename in os.listdir(folder_path):
+    for filename in tqdm(os.listdir(folder_path), desc="Loading images"):
         img = cv2.imread(os.path.join(folder_path, filename))
-        img_name = filename.split('.')[0]
+        paper_id = filename.split('.')[0]
         if img is not None:
-            image_dict[img_name] = img
+            image_list.append([paper_id, img])
 
-    return image_dict
+    return image_list
 
 
 # load the models
@@ -27,16 +29,18 @@ embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 detection_model = YOLO('ms_question_detection.pt')
 
 # load datas
-question_path = "raw_question_bank/multi/images"
-cv2image = convert_images_to_cv2_values(question_path).values
-cv2image_names = convert_images_to_cv2_values(question_path).keys()
+question_path = "raw_question_bank/multi/image_test"
+ls_img = convert_images_to_cv2_values(question_path) 
+cv2image = [question[1] for question in ls_img]
+cv2image_names =  [question[0] for question in ls_img]
+
 
 ##############################################################################
 ############################# question analysis ############################## 
 ##############################################################################
 
 # filter the question by confidence
-def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
+def get_boxes_xyxy_numpy(result, conf_threshold=0.69):
 
     # Create a mask of booleans where the confidence is greater than the given threshold
     mask = result.boxes.conf > conf_threshold
@@ -50,7 +54,7 @@ def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
     assert len(selected_xyxy) == len(selected_cls), "Lengths of selected bounding boxes and classes do not match."
 
     # Combine bounding boxes and their corresponding classes
-    combined = [[xyxy_val, "", cls_val] for xyxy_val, cls_val in zip(selected_xyxy, selected_cls)]
+    combined = [[xyxy_val, "", cls_val, ""] for xyxy_val, cls_val in zip(selected_xyxy, selected_cls)]
 
     return combined
 
@@ -58,7 +62,7 @@ def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
 def q_data_const(detection_result):
     # create container to store the data
     q_data = []
-    for result in detect_results:
+    for result in tqdm(detect_results, desc="Processing OCR and generating embeddings"):
         xyxy = get_boxes_xyxy_numpy(result)
         q_data.append(xyxy)
 
@@ -76,7 +80,7 @@ def q_data_const(detection_result):
             cropped_image = image[ round(y1):round(y2),round(x1):round(x2)]
             question[1] = " ".join(reader.readtext(cropped_image, detail = 0))
             question[2] = embedding_model.encode(question[1])
-            question[3]
+            question[3] = name
         counter += 1
         for page in range(len(q_data)):
             q_data[page] = sorted(q_data[page], key=lambda x: x[0][1])
@@ -94,33 +98,39 @@ def mark_question(q_data):
             cv2.destroyAllWindows()
 
 # detect the questions
+print("Object detection with YOLOv8...")
+print(len(cv2image))
 detect_results = detection_model.predict(source=cv2image, show = False, device='mps')
+print("Processing OCR and generating embeddings...")
 question_data = q_data_const(detect_results)
-mark_question(question_data)
+# mark_question(question_data)
 
+
+##############################################################################
+############################# insert to database ############################# 
+##############################################################################
 def insert_data(question_data):
-    for page in range(len(question_data)):
-        for question in question_data[page]:
-            # create a connection to the database
-            cnx = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='hello',
-                database='anti_andy'
-            )
 
-            # create a cursor object
-            cursor = cnx.cursor()
+    # create a connection to the database
+    cnx = mysql.connector.connect(
+        host='localhost',
+        user='root',
+        password='hello',
+        database='anti_andy'
+    )
+    # create a cursor object
+    cursor = cnx.cursor() 
 
+    for page in tqdm(range(len(question_data)), desc="Inserting data into database"):
+        for question in range(len(question_data[page])):
             # data to insert
             data = {
                 'text': question_data[page][question][1],
-                'embedding': question_data[page][question][2],
-                'paper': 'Example paper',
+                'embedding': pickle.dumps(question_data[page][question][2]),
+                'paper': question_data[page][question][3],
                 'page': page,
                 'q_number': question 
             }
-
 
             # prepare insert statement
             add_data = ("INSERT INTO question_bank"
@@ -133,6 +143,8 @@ def insert_data(question_data):
             # commit the changes
             cnx.commit()
 
-            # close the cursor and connection
-            cursor.close()
-            cnx.close()
+    # close the cursor and connection
+    cursor.close()
+    cnx.close()
+
+insert_data(question_data)

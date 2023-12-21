@@ -11,6 +11,10 @@ def convert_pdf_to_image(pdf_file, pdf_dir, save_dir):
 
     # Iterate over every image (i.e., every page of the PDF)
     for i, image in enumerate(images):
+        # Skip the first three pages
+        if i < 3:
+            continue
+
         # Convert the PIL Image to an OpenCV Image (in BGR format)
         cv2_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
@@ -32,9 +36,7 @@ def convert_pdf_to_images_concurrent(pdf_dir, save_dir):
 
 def main():
     # Call the function
-    convert_pdf_to_images_concurrent('raw_question_bank/multi', 'raw_question_bank/multi/images')
-
+    convert_pdf_to_images_concurrent('raw_question_bank/multi/pdf', 'raw_question_bank/multi/images')
 
 if __name__ == '__main__':
     main()
-
