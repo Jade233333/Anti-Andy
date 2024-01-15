@@ -2,11 +2,21 @@ import chromadb
 
 client = chromadb.PersistentClient(path="question_bank")
 
-collection = client.get_or_create_collection(name="question_bank"
-                                             metadata={"hnsw:space": "l2"})
+question_bank = client.get_or_create_collection(name="question_bank",
+                                                metadata={"hnsw:space": "l2"})
 
-collection.add(
-    documents=["lorem ipsum...", "doc2", "doc3", ...],
-    metadatas=[{"chapter": "3", "verse": "16"}, {"chapter": "3", "verse": "5"}, {"chapter": "29", "verse": "11"}, ...],
-    ids=["id1", "id2", "id3", ...]
-)       
+question_bank.upsert(
+    documents=["testing, testing"],
+    metadatas=[{"paper": 1, "page": 1, "question": 1}],
+    ids=["id1"]
+) 
+
+
+result = question_bank.query(
+    query_texts="testing",
+    n_results=1,
+    include=["documents","distances","metadatas"]
+)
+
+
+print(result)

@@ -40,14 +40,13 @@ def get_boxes_xyxy_numpy(result, conf_threshold=0.7):
 
     # Use this mask to select the rows from xyxy and cls
     selected_xyxy = result.boxes.xyxy[mask].tolist()
-    selected_cls = result.boxes.cls[mask].tolist()
 
     # Combine selected_xyxy and selected_cls into a list of lists
     # Ensure that selected_xyxy and selected_cls have the same length
-    assert len(selected_xyxy) == len(selected_cls), "Lengths of selected bounding boxes and classes do not match."
+    assert len(selected_xyxy) == len(result.boxes.xyxy[mask])
 
     # Combine bounding boxes and their corresponding classes
-    combined = [[xyxy_val, "", cls_val] for xyxy_val, cls_val in zip(selected_xyxy, selected_cls)]
+    combined = [[xyxy_val, ""] for xyxy_val in selected_xyxy]
 
     return combined
 
@@ -71,10 +70,9 @@ def q_data_const(detection_result):
             image = cv2image[counter]
             cropped_image = image[ round(y1):round(y2),round(x1):round(x2)]
             question[1] = " ".join(reader.readtext(cropped_image, detail = 0))
-            question[2] = embedding_model.encode(question[1])
         counter += 1
         for page in range(len(q_data)):
-            q_data[page] = sorted_list = sorted(q_data[page], key=lambda x: x[0][1])
+            q_data[page] = sorted(q_data[page], key=lambda x: x[0][1])
 
     return q_data
 
@@ -91,4 +89,8 @@ def mark_question(q_data):
 # detect the questions
 detect_results = detection_model.predict(source=cv2image, show = False, device='mps')
 question_data = q_data_const(detect_results)
-mark_question(question_data)
+# mark_question(question_data)
+
+##############################################################################
+###################### Similarity Search in Database #########################
+############################################################################
